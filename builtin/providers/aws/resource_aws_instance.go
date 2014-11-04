@@ -73,6 +73,35 @@ func resourceAwsInstance() *schema.Resource {
 				Optional: true,
 			},
 
+			"block_device": &schema.Schema{
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"device_name": &schema.Schema{
+							Type:     schema.TypeString,
+							Required: true,
+						},
+
+						"virtual_name": &schema.Schema{
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+
+						"snapshot_id": &schema.Schema{
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+
+						"delete_on_termination": &schema.Schema{
+							Type:     schema.TypeBool,
+							Optional: true,
+							Default:  true,
+						},
+					},
+				},
+			},
+
 			"user_data": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
@@ -156,6 +185,21 @@ func resourceAwsInstanceCreate(d *schema.ResourceData, meta interface{}) error {
 		UserData:                 []byte(userData),
 		EbsOptimized:             d.Get("ebs_optimized").(bool),
 		IamInstanceProfile:       d.Get("iam_instance_profile").(string),
+	}
+
+	// Add configured blockDevices
+	blockDevicesCount := d.Get("block_device.#").(int)
+	for i := 0; i < blockDevicesCount; i++ {
+		prefix := fmt.Sprintf("block_device.%d", i)
+
+		mapping := ec2.BlockDeviceMapping{
+			DeviceName:          d.Get(prefix + ".device_name").(string),
+			VirtualName:         d.Get(prefix + ".virtual_name").(string),
+			SnapshotId:          d.Get(prefix + ".snapshot_id").(string),
+			DeleteOnTermination: d.Get(prefix + ".delete_on_termination").(bool),
+		}
+
+		runOpts.BlockDevices = append(runOpts.BlockDevices, mapping)
 	}
 
 	if v := d.Get("security_groups"); v != nil {
