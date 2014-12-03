@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform/helper/config"
@@ -40,7 +41,15 @@ func (p *ResourceProvisioner) Apply(
 	if !ok {
 		return fmt.Errorf("Unsupported 'destination' type! Must be string.")
 	}
-	return p.copyFiles(conf, src, dst)
+
+	inlineScript := false
+	if isRaw, ok := c.Config["inline_script"]; ok {
+		if is, ok := isRaw.(bool); ok {
+			inlineScript = is
+		}
+	}
+
+	return p.copyFiles(conf, src, dst, inlineScript)
 }
 
 func (p *ResourceProvisioner) Validate(c *terraform.ResourceConfig) (ws []string, es []error) {
@@ -49,12 +58,15 @@ func (p *ResourceProvisioner) Validate(c *terraform.ResourceConfig) (ws []string
 			"source",
 			"destination",
 		},
+		Optional: []string{
+			"inline_script",
+		},
 	}
 	return v.Validate(c)
 }
 
 // copyFiles is used to copy the files from a source to a destination
-func (p *ResourceProvisioner) copyFiles(conf *helper.SSHConfig, src, dst string) error {
+func (p *ResourceProvisioner) copyFiles(conf *helper.SSHConfig, src, dst string, inline bool) error {
 	// Get the SSH client config
 	config, err := helper.PrepareConfig(conf)
 	if err != nil {
@@ -69,6 +81,16 @@ func (p *ResourceProvisioner) copyFiles(conf *helper.SSHConfig, src, dst string)
 		return err
 	})
 	if err != nil {
+		return err
+	}
+
+	if inline {
+		// If we're uploading an inline source just create a reader for it
+		// and short circut the upload
+		err = comm.Upload(dst, strings.NewReader(src))
+		if err != nil {
+			return fmt.Errorf("Upload failed: %v", err)
+		}
 		return err
 	}
 
