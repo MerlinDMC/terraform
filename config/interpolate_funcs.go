@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"regexp"
@@ -22,6 +23,7 @@ func init() {
 		"element": interpolationFuncElement(),
 		"replace": interpolationFuncReplace(),
 		"split":   interpolationFuncSplit(),
+		"asjson":  interpolationFuncAsJson(),
 
 		// Concat is a little useless now since we supported embeddded
 		// interpolations but we keep it around for backwards compat reasons.
@@ -182,6 +184,35 @@ func interpolationFuncElement() ast.Function {
 
 			v := list[index%len(list)]
 			return v, nil
+		},
+	}
+}
+
+// interpolationFuncAsJson implements the "asjson" function that will convert
+// the given arguments into their json representation.
+func interpolationFuncAsJson() ast.Function {
+	return ast.Function{
+		ArgTypes:   []ast.Type{ast.TypeString},
+		ReturnType: ast.TypeString,
+		Callback: func(args []interface{}) (interface{}, error) {
+			var list []string
+			var enc []byte
+			var err error
+
+			list = strings.Split(args[0].(string), InterpSplitDelim)
+
+			if len(list) == 1 {
+				enc, err = json.Marshal(list[0])
+			} else {
+				enc, err = json.Marshal(list)
+			}
+
+			if err != nil {
+				return "", fmt.Errorf(
+					"cannot convert arguments to json: %s", err)
+			} else {
+				return string(enc), nil
+			}
 		},
 	}
 }

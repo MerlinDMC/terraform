@@ -277,6 +277,33 @@ func TestInterpolateFuncElement(t *testing.T) {
 	})
 }
 
+func TestInterpolateFuncAsJson(t *testing.T) {
+	testFunction(t, testFunctionConfig{
+		Cases: []testFunctionCase{
+			{
+				`${asjson("foo")}`,
+				`"foo"`,
+				false,
+			},
+
+			{
+				fmt.Sprintf(`${asjson("%s")}`,
+					"foo"+InterpSplitDelim+"bar"),
+				`["foo","bar"]`,
+				false,
+			},
+
+			// Too many args
+			{
+				fmt.Sprintf(`${asjson("%s", "1")}`,
+					"foo"+InterpSplitDelim+"bar"),
+				nil,
+				true,
+			},
+		},
+	})
+}
+
 type testFunctionConfig struct {
 	Cases []testFunctionCase
 	Vars  map[string]ast.Variable
